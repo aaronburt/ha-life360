@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import IntEnum
+from math import ceil
 import logging
 import ssl
 from typing import Any, NewType, Self, cast, override
@@ -38,13 +39,17 @@ from .const import (
     COMM_TIMEOUT,
     CONF_ACCOUNTS,
     CONF_AUTHORIZATION,
+    CONF_DAILY_REQUEST_BUDGET,
     CONF_DRIVING_SPEED,
     CONF_MAX_GPS_ACCURACY,
     CONF_SHOW_DRIVING,
+    CONF_UPDATE_INTERVAL,
     CONF_VERBOSITY,
+    DEFAULT_DAILY_REQUEST_BUDGET,
     DOMAIN,
     SPEED_DIGITS,
     SPEED_FACTOR_MPH,
+    UPDATE_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,6 +126,8 @@ class ConfigOptions:
     driving_speed: float | None = None
     max_gps_accuracy: float | None = None
     verbosity: int = 0
+    daily_request_budget: int = DEFAULT_DAILY_REQUEST_BUDGET
+    update_interval: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Return a dict representation of the data."""
@@ -139,7 +146,24 @@ class ConfigOptions:
             data[CONF_DRIVING_SPEED],
             data[CONF_MAX_GPS_ACCURACY],
             data[CONF_VERBOSITY],
+            data.get(CONF_DAILY_REQUEST_BUDGET, DEFAULT_DAILY_REQUEST_BUDGET),
+            data.get(CONF_UPDATE_INTERVAL),
         )
+
+
+def member_update_interval(options: ConfigOptions, polled: int) -> timedelta:
+    """Return how often to poll each Member.
+
+    `polled` is the number of (Member, Circle) pairs polled each cycle, since each
+    pair costs one request. Spread the daily request budget evenly across them, but
+    never poll more often than the default interval. A fixed interval in the options
+    takes precedence, but is still not allowed to be shorter than the minimum.
+    """
+    if options.update_interval is not None:
+        return max(UPDATE_INTERVAL, timedelta(seconds=options.update_interval))
+    budget = max(1, options.daily_request_budget)
+    seconds = ceil(86400 * max(polled, 0) / budget)
+    return max(UPDATE_INTERVAL, timedelta(seconds=seconds))
 
 
 @dataclass

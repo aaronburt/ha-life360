@@ -22,6 +22,7 @@ from homeassistant.const import (
     CONF_USERNAME,
     UnitOfLength,
     UnitOfSpeed,
+    UnitOfTime,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.issue_registry import async_delete_issue
@@ -44,10 +45,12 @@ from .const import (
     COMM_MAX_RETRIES,
     CONF_ACCOUNTS,
     CONF_AUTHORIZATION,
+    CONF_DAILY_REQUEST_BUDGET,
     CONF_DRIVING_SPEED,
     CONF_MAX_GPS_ACCURACY,
     CONF_SHOW_DRIVING,
     CONF_TOKEN_TYPE,
+    CONF_UPDATE_INTERVAL,
     CONF_VERBOSITY,
     DOMAIN,
 )
@@ -119,6 +122,10 @@ class Life360Flow(ConfigEntryBaseFlow, ABC):
             )
             self._opts.driving = cast(bool, user_input[CONF_SHOW_DRIVING])
             self._opts.verbosity = int(user_input[CONF_VERBOSITY])
+            self._opts.daily_request_budget = int(user_input[CONF_DAILY_REQUEST_BUDGET])
+            self._opts.update_interval = cast(
+                float | None, user_input.get(CONF_UPDATE_INTERVAL)
+            )
 
             return await self.async_step_acct_menu()
 
@@ -141,6 +148,21 @@ class Life360Flow(ConfigEntryBaseFlow, ABC):
                     )
                 ),
                 vol.Required(CONF_SHOW_DRIVING): BooleanSelector(),
+                vol.Required(CONF_DAILY_REQUEST_BUDGET): NumberSelector(
+                    NumberSelectorConfig(
+                        min=1000,
+                        step=1000,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(CONF_UPDATE_INTERVAL): NumberSelector(
+                    NumberSelectorConfig(
+                        min=5,
+                        step="any",
+                        unit_of_measurement=UnitOfTime.SECONDS,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
                 vol.Required(CONF_VERBOSITY): SelectSelector(
                     SelectSelectorConfig(
                         options=[str(i) for i in range(5)],
@@ -157,9 +179,14 @@ class Life360Flow(ConfigEntryBaseFlow, ABC):
             data_schema = self.add_suggested_values_to_schema(
                 data_schema, {CONF_DRIVING_SPEED: self._opts.driving_speed}
             )
+        if self._opts.update_interval is not None:
+            data_schema = self.add_suggested_values_to_schema(
+                data_schema, {CONF_UPDATE_INTERVAL: self._opts.update_interval}
+            )
         data_schema = self.add_suggested_values_to_schema(
             data_schema,
             {
+                CONF_DAILY_REQUEST_BUDGET: self._opts.daily_request_budget,
                 CONF_SHOW_DRIVING: self._opts.driving,
                 CONF_VERBOSITY: str(self._opts.verbosity),
             },
