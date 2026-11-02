@@ -499,6 +499,8 @@ class Life360OptionsFlow(OptionsFlow, Life360Flow):
         del_aids = set(old_opts.accounts) - set(self._opts.accounts)
         for aid in del_aids | self._authorized_aids:
             async_delete_issue(self.hass, DOMAIN, aid)
+        for aid in del_aids:
+            async_delete_issue(self.hass, DOMAIN, f"{aid}_rate_limited")
 
         old_en_aids = {aid for aid, acct in old_opts.accounts.items() if acct.enabled}
         new_en_aids = {aid for aid, acct in self._opts.accounts.items() if acct.enabled}

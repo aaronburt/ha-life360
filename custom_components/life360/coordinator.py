@@ -7,6 +7,7 @@ from collections.abc import Callable, Coroutine, Iterable
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum, auto
 from functools import partial
 import logging
@@ -20,7 +21,11 @@ from propcache.api import cached_property
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
+from homeassistant.helpers.issue_registry import (
+    IssueSeverity,
+    async_create_issue,
+    async_delete_issue,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -31,6 +36,7 @@ from .const import (
     LOGIN_ERROR_RETRY_DELAY,
     LTD_LOGIN_ERROR_RETRY_DELAY,
     MAX_LTD_LOGIN_ERROR_RETRIES,
+    RATE_LIMIT_MAX_SLEEP,
     SIGNAL_ACCT_STATUS,
     UPDATE_INTERVAL,
 )
@@ -62,6 +68,12 @@ class AccountData:
     api: helpers.Life360
     failed: asyncio.Event
     online: bool = True
+    rate_limited_until: datetime | None = None
+
+
+def _rate_limit_issue_id(aid: AccountID) -> str:
+    """Return repair issue ID for account rate limit."""
+    return f"{aid}_rate_limited"
 
 
 class LoginRateLimitErrResp(Enum):
@@ -439,6 +451,8 @@ class CirclesMembersDataUpdateCoordinator(DataUpdateCoordinator[CirclesMembersDa
         """Make a request to the Life360 server."""
         if self._acct_data[aid].failed.is_set():
             return RequestError.NO_DATA
+        if self._rate_limited(aid):
+            return RequestError.NO_DATA
 
         start = dt_util.utcnow()
         login_error_retries = 0
@@ -545,8 +559,12 @@ class CirclesMembersDataUpdateCoordinator(DataUpdateCoordinator[CirclesMembersDa
                 except Life360Error as exc:
                     if isinstance(exc, RateLimited):
                         if lrle_resp is not LoginRateLimitErrResp.SILENT:
+                            retry_after = ceil(exc.retry_after or 0) + 10
+                            if retry_after > RATE_LIMIT_MAX_SLEEP:
+                                self._handle_rate_limited(aid, retry_after, msg, exc)
+                                return RequestError.NO_DATA
                             self._set_acct_exc(aid)
-                            delay = ceil(exc.retry_after or 0) + 10
+                            delay = retry_after
                             delay_reason = "rate limited"
                             continue
                         treat_as_error = False
@@ -562,6 +580,7 @@ class CirclesMembersDataUpdateCoordinator(DataUpdateCoordinator[CirclesMembersDa
                         raise asyncio.CancelledError
                     if failed.is_set():
                         return RequestError.NO_DATA
+                    self._clear_rate_limited(aid)
                     self._set_acct_exc(aid)
                     return result
 
@@ -579,6 +598,53 @@ class CirclesMembersDataUpdateCoordinator(DataUpdateCoordinator[CirclesMembersDa
         finally:
             if warned:
                 _LOGGER.warning("Done trying to get response from Life360 for %s", aid)
+
+    def _rate_limited(self, aid: AccountID) -> bool:
+        """Return if account is still within a long server-imposed rate limit."""
+        until = self._acct_data[aid].rate_limited_until
+        if until is None:
+            return False
+        if dt_util.utcnow() < until:
+            return True
+        # Limit has expired. Allow a request to try again; success clears the issue.
+        self._acct_data[aid].rate_limited_until = None
+        return False
+
+    def _handle_rate_limited(
+        self, aid: AccountID, retry_after: int, msg: str, exc: Exception
+    ) -> None:
+        """Handle a long rate limit: go offline, tell the user, and stop requesting."""
+        until = dt_util.utcnow() + timedelta(seconds=retry_after)
+        acct = self._acct_data[aid]
+        first = acct.rate_limited_until is None
+        acct.rate_limited_until = until
+        if first:
+            _LOGGER.warning(
+                "%s: rate limited by Life360 until %s; not making requests until then",
+                aid,
+                dt_util.as_local(until).isoformat(timespec="seconds"),
+            )
+        async_create_issue(
+            self.hass,
+            DOMAIN,
+            _rate_limit_issue_id(aid),
+            is_fixable=False,
+            severity=IssueSeverity.WARNING,
+            translation_key="rate_limited",
+            translation_placeholders={
+                "acct_id": aid,
+                "until": dt_util.as_local(until).strftime("%Y-%m-%d %H:%M"),
+            },
+        )
+        self._set_acct_exc(aid, False, msg, exc)
+
+    def _clear_rate_limited(self, aid: AccountID) -> None:
+        """Clear rate limit state and repair issue after a successful request."""
+        acct = self._acct_data[aid]
+        if acct.rate_limited_until is None and acct.online:
+            return
+        acct.rate_limited_until = None
+        async_delete_issue(self.hass, DOMAIN, _rate_limit_issue_id(aid))
 
     def _set_acct_exc(
         self,

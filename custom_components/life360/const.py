@@ -12,6 +12,9 @@ COMM_TIMEOUT = ClientTimeout(sock_connect=15, total=60)
 LOGIN_ERROR_RETRY_DELAY = 5 * 60
 LTD_LOGIN_ERROR_RETRY_DELAY = 60
 MAX_LTD_LOGIN_ERROR_RETRIES = 30
+# Rate limit waits longer than this are not slept through; instead the account is
+# marked offline, a repair issue is created, and requests are skipped until it expires.
+RATE_LIMIT_MAX_SLEEP = 10 * 60
 SPEED_FACTOR_MPH = 2.25
 SPEED_DIGITS = 1
 UPDATE_INTERVAL = timedelta(seconds=5)
