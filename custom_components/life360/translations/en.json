@@ -90,6 +90,10 @@
         }
     },
     "issues": {
+        "rate_limited": {
+            "title": "Life360 Rate Limited",
+            "description": "Life360 has temporarily rate limited account {acct_id} until about {until}. Location updates are paused until then. Reducing the number of tracked members, or the polling frequency, helps avoid this."
+        },
         "login_error": {
             "title": "Life360 Account Login Error",
             "description": "Account {acct_id} credentials must be updated.\n\nTo fix, [click here](/config/integrations/integration/life360) then click CONFIGURE and modify account."
