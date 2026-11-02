@@ -17,11 +17,13 @@
         "step": {
             "init": {
                 "title": "Basic Options",
-                "description": "The GPS accuracy attribute defines the radius of a circle around the GPS point wherein the device is located. Hence, bigger numbers mean LESS accuracy. A limit to the accuracy radius may be set below, or it may be left blank. If set, any updates that are less accurate than this value will be ignored. If used, a good starting point is 100m.",
+                "description": "Polling frequency is chosen so the total number of requests per day stays within the daily request budget (Life360 rate limits clients that make too many requests). Set a fixed update interval to override that, but not below 5 seconds.\n\nThe GPS accuracy attribute defines the radius of a circle around the GPS point wherein the device is located. Hence, bigger numbers mean LESS accuracy. A limit to the accuracy radius may be set below, or it may be left blank. If set, any updates that are less accurate than this value will be ignored. If used, a good starting point is 100m.",
                 "data": {
                     "max_gps_accuracy": "GPS accuracy radius limit",
                     "driving_speed": "Driving speed threshold",
                     "driving": "Show driving as state",
+                    "daily_request_budget": "Daily request budget",
+                    "update_interval": "Fixed update interval",
                     "verbosity": "DEBUG message verbosity"
                 }
             },
@@ -111,11 +113,13 @@
         "step": {
             "init": {
                 "title": "Basic Options",
-                "description": "The GPS accuracy attribute defines the radius of a circle around the GPS point wherein the device is located. Hence, bigger numbers mean LESS accuracy. A limit to the accuracy radius may be set below, or it may be left blank. If set, any updates that are less accurate than this value will be ignored. If used, a good starting point is 100m.",
+                "description": "Polling frequency is chosen so the total number of requests per day stays within the daily request budget (Life360 rate limits clients that make too many requests). Set a fixed update interval to override that, but not below 5 seconds.\n\nThe GPS accuracy attribute defines the radius of a circle around the GPS point wherein the device is located. Hence, bigger numbers mean LESS accuracy. A limit to the accuracy radius may be set below, or it may be left blank. If set, any updates that are less accurate than this value will be ignored. If used, a good starting point is 100m.",
                 "data": {
                     "max_gps_accuracy": "GPS accuracy radius limit",
                     "driving_speed": "Driving speed threshold",
                     "driving": "Show driving as state",
+                    "daily_request_budget": "Daily request budget",
+                    "update_interval": "Fixed update interval",
                     "verbosity": "DEBUG message verbosity"
                 }
             },

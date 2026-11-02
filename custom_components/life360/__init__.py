@@ -21,6 +21,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
+from . import helpers
 from .const import (
     DOMAIN,
     SERVICE_UPDATE_LOCATION,
@@ -33,7 +34,7 @@ from .coordinator import (
     L360Coordinators,
     MemberDataUpdateCoordinator,
 )
-from .helpers import Life360Store, MemberID
+from .helpers import ConfigOptions, Life360Store, MemberID
 
 # Needed only if setup or async_setup exists.
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -102,8 +103,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: L360ConfigEntry) -> bool
             mem_coordinator[mid] = mem_crd
             coros.append(mem_crd.async_refresh())
         if coros:
+            update_intervals()
             await asyncio.gather(*coros)
             async_dispatcher_send(hass, SIGNAL_MEMBERS_CHANGED)
+
+    @callback
+    def update_intervals() -> None:
+        """Set Members' polling interval from options and number of requests."""
+        polled = sum(len(coordinator.mem_circles[mid]) for mid in mem_coordinator)
+        interval = helpers.member_update_interval(
+            ConfigOptions.from_dict(entry.options), polled
+        )
+        for mem_crd in mem_coordinator.values():
+            if mem_crd.update_interval != interval:
+                _LOGGER.debug("%s: update interval: %s", mem_crd.name, interval)
+                mem_crd.update_interval = interval
 
     @callback
     def process_data() -> None:
@@ -115,8 +129,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: L360ConfigEntry) -> bool
     # Set up components for our platforms.
     await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
 
+    async def options_updated(_: HomeAssistant, __: L360ConfigEntry) -> None:
+        """Handle options update."""
+        update_intervals()
+
     process_data()
     entry.async_on_unload(coordinator.async_add_listener(process_data))
+    entry.async_on_unload(entry.add_update_listener(options_updated))
     return True
 
 

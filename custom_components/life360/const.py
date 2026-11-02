@@ -12,12 +12,11 @@ COMM_TIMEOUT = ClientTimeout(sock_connect=15, total=60)
 LOGIN_ERROR_RETRY_DELAY = 5 * 60
 LTD_LOGIN_ERROR_RETRY_DELAY = 60
 MAX_LTD_LOGIN_ERROR_RETRIES = 30
-# Rate limit waits longer than this are not slept through; instead the account is
-# marked offline, a repair issue is created, and requests are skipped until it expires.
 RATE_LIMIT_MAX_SLEEP = 10 * 60
 SPEED_FACTOR_MPH = 2.25
 SPEED_DIGITS = 1
 UPDATE_INTERVAL = timedelta(seconds=5)
+DEFAULT_DAILY_REQUEST_BUDGET = 150_000
 
 ATTR_ADDRESS = "address"
 ATTR_AT_LOC_SINCE = "at_loc_since"
@@ -33,10 +32,12 @@ STATE_DRIVING = "driving"
 
 CONF_ACCOUNTS = "accounts"
 CONF_AUTHORIZATION = "authorization"
+CONF_DAILY_REQUEST_BUDGET = "daily_request_budget"
 CONF_DRIVING_SPEED = "driving_speed"
 CONF_MAX_GPS_ACCURACY = "max_gps_accuracy"
 CONF_SHOW_DRIVING = "driving"
 CONF_TOKEN_TYPE = "token_type"
+CONF_UPDATE_INTERVAL = "update_interval"
 CONF_VERBOSITY = "verbosity"
 
 SERVICE_UPDATE_LOCATION = "update_location"

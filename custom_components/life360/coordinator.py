@@ -606,7 +606,6 @@ class CirclesMembersDataUpdateCoordinator(DataUpdateCoordinator[CirclesMembersDa
             return False
         if dt_util.utcnow() < until:
             return True
-        # Limit has expired. Allow a request to try again; success clears the issue.
         self._acct_data[aid].rate_limited_until = None
         return False
 
